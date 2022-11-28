@@ -9,12 +9,13 @@
 #SBATCH --time=120:00:00              # The time the job will take to run.
 #SBATCH --mem-per-cpu=8gb        # The memory the job will use per cpu core.
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=ak4572@columbia.edu
+#SBATCH --mail-user=hs3110@columbia.edu
 
 
 module load matlab
 module load anaconda/3-5.3.1
-source activate fmri-sim
+conda activate fmri-sim
+export PATH="/moto/home/hs3110/.conda/envs/fmri-sim/bin:$PATH"
 
 for (( time=1; time <= 2; time=time+1 )); do 
     matlab -nodisplay -nosplash - nodesktop -r "cd /moto/home/ak4572/; try, run ('/moto/home/ak4572/Noise_shuffling_moto.m'); catch me, fprintf('%s / %s\n',me.identifier,me.message), end, exit"

@@ -9,11 +9,11 @@ clc
 clear all
 format long g
 Dirs.BIDSdir = '/moto/nklab/projects/ds001246/';
-matlab_docs = '/moto/home/ak4572/';
-cd(matlab_docs);
-addpath(genpath(fullfile(matlab_docs, 'Toolboxes', 'nifti_utils')));
-addpath(fullfile(matlab_docs, 'Toolboxes', 'spm12'));
-addpath(fullfile(matlab_docs, 'Simulation_Utils'));
+matlab_docs = '/moto/home/fmri-simulations/matlab';
+% cd(matlab_docs);
+addpath(genpath(fullfile(matlab_docs, 'nifti_utils')));
+addpath(fullfile(matlab_docs, 'spm12'));
+addpath(fullfile(matlab_docs, 'Simulation_Utils')); 
 
 Opts = struct();
 Opts.n_permutations = 2;
