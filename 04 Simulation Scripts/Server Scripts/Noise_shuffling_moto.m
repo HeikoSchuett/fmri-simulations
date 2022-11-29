@@ -24,8 +24,8 @@ Opts.session_type = [Opts.task, Opts.subtask];
 Opts.n_stim_betas = 50;
 Opts.pool_inference = false;
 Opts.rewrite = true; % overwrites previously saved outputs
-Dirs = parse_bids_base_name(Dirs, 'Noise_perm_r'); % Parse BIDS directory
-Dirs.GLM_results = fullfile(Dirs.BIDSdir, 'derivatives', 'Dual_GLM_r');
+Dirs = parse_bids_base_name(Dirs, 'Noise_perm'); % Parse BIDS directory
+Dirs.GLM_results = fullfile(Dirs.BIDSdir, 'derivatives', 'Dual_GLM');
 
 for i = 1 : Dirs.n_subs
     Dirs = parse_bids_sub(Dirs, Opts, i);
