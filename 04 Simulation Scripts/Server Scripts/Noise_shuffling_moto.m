@@ -9,7 +9,7 @@ clc
 clear all
 format long g
 Dirs.BIDSdir = '/moto/nklab/projects/ds001246/';
-matlab_docs = '/moto/home/fmri-simulations/matlab';
+matlab_docs = '/moto/home/hs3110/fmri-simulations/matlab';
 % cd(matlab_docs);
 addpath(genpath(fullfile(matlab_docs, 'nifti_utils')));
 addpath(fullfile(matlab_docs, 'spm12'));
