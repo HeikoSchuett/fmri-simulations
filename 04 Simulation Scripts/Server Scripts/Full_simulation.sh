@@ -18,13 +18,16 @@ export PATH="/moto/home/hs3110/.conda/envs/fmri-sim/bin:$PATH"
 mkdir /tmp/$SLURM_JOB_ID
 mkdir /tmp/$SLURM_JOB_ID/data
 
+export SOURCE='/moto/nklab/projects/ds001246_r/'
+export INTERMEDIATE='/tmp/$SLURM_JOB_ID'
+
 cd /moto/home/hs3110/fmri-simulations/04\ Simulation\ Scripts/Server\ Scripts
 
-matlab -nodisplay -nosplash - nodesktop -r "cd /tmp/$SLURM_JOB_ID; try, run ('/moto/home/hs3110/fmri-simulations/04 Simulation Scripts/Server Scripts/Noise_shuffling_moto.m'); catch me, fprintf('%s / %s\n',me.identifier,me.message), end, exit"
-matlab -nodisplay -nosplash - nodesktop -r "cd /tmp/$SLURM_JOB_ID; try, run ('/moto/home/hs3110/fmri-simulations/04 Simulation Scripts/Server Scripts/GLM_on_sim_moto.m'); catch me, fprintf('%s / %s\n',me.identifier,me.message), end, exit"
+matlab -nodisplay -nosplash - nodesktop -r "cd $INTERMEDIATE; try, run ('/moto/home/hs3110/fmri-simulations/04 Simulation Scripts/Server Scripts/Noise_shuffling_moto.m'); catch me, fprintf('%s / %s\n',me.identifier,me.message), end, exit"
+matlab -nodisplay -nosplash - nodesktop -r "cd $INTERMEDIATE; try, run ('/moto/home/hs3110/fmri-simulations/04 Simulation Scripts/Server Scripts/GLM_on_sim_moto.m'); catch me, fprintf('%s / %s\n',me.identifier,me.message), end, exit"
 python 01-Pool_simulation_results_moto.py
 python 02-Create_sim_pyrsa_dataset_moto.py
 python 03-Create_sim_RDMs_moto.py
 python 04-Test_sim_fixed_inference_moto.py
 
-rm -rf /tmp/$SLURM_JOB_ID
+rm -rf $INTERMEDIATE
