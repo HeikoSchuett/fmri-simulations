@@ -27,10 +27,12 @@ Opts.rewrite = true; % overwrites previously saved outputs
 Dirs = parse_bids_base_name(Dirs, 'Noise_perm'); % Parse BIDS directory
 Dirs.GLM_results = fullfile(Dirs.BIDSdir, 'derivatives', 'Dual_GLM');
 
+Dirs.outputdir = '/tmp/data';
+
 for i = 1 : Dirs.n_subs
     Dirs = parse_bids_sub(Dirs, Opts, i);
     r = 0;
-    for s = 1 : Dirs.n_ses  
+    for s = 1 : Dirs.n_ses
         Dirs = get_runs(Dirs, s);
 
         for n = 1 : Dirs.n_runs

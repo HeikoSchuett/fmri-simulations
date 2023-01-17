@@ -7,12 +7,11 @@
 clc
 clear all
 format long g
-Dirs.BIDSdir = '/moto/nklab/projects/ds001246/';
-matlab_docs = '/moto/home/ak4572/';
-cd(matlab_docs);
-addpath(genpath(fullfile(matlab_docs, 'Toolboxes', 'nifti_utils')));
-addpath(fullfile(matlab_docs, 'Toolboxes', 'spm12'));
-addpath(fullfile(matlab_docs, 'Simulation_Utils'));
+Dirs.BIDSdir = '/moto/nklab/projects/ds001246_r/';
+matlab_docs = '/moto/home/hs3110/fmri-simulations/matlab';
+addpath(genpath(fullfile(matlab_docs, 'nifti_utils')));
+addpath(fullfile(matlab_docs, 'spm12'));
+addpath(fullfile(matlab_docs, 'Simulation_Utils')); 
 
 Opts = struct();
 Opts.snr = [10, 1, 0.1];
@@ -26,8 +25,9 @@ Opts.pool_inference = false;
 Opts.rewrite = true; % overwrites previously saved outputs
 Opts.delete_input = true;
 Dirs = parse_bids_base_name(Dirs, 'Data_perm'); % Parse BIDS directory
-Dirs.inputdir = fullfile(Dirs.BIDSdir, 'derivatives', 'Noise_perm');
+Dirs.inputdir = '/tmp/data'; %fullfile(Dirs.BIDSdir, 'derivatives', 'Noise_perm');
 Dirs.GLM_results = fullfile(Dirs.BIDSdir, 'derivatives', 'Dual_GLM');
+Dirs.outputdir = '/tmp/glm/';
 spm('Defaults','fMRI'); %Initialise SPM fmri
 spm_jobman('initcfg');  %Initialise SPM batch mode
 
