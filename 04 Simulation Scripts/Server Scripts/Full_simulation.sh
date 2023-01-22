@@ -18,7 +18,7 @@ export PATH="/moto/home/hs3110/.conda/envs/fmri-sim/bin:$PATH"
 mkdir /tmp/$SLURM_JOB_ID
 
 export SOURCE='/moto/nklab/projects/ds001246_r/'
-export INTERMEDIATE='/tmp/$SLURM_JOB_ID'
+export INTERMEDIATE="/tmp/$SLURM_JOB_ID"
 export CODE='/moto/home/hs3110/fmri-simulations/04 Simulation Scripts/Server Scripts'
 export MATLAB_CODE='/moto/home/hs3110/fmri-simulations/matlab'
 
