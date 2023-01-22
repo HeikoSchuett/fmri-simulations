@@ -60,9 +60,7 @@ def oe_split_reliability(
     dataset, residuals=None, obs_desc="run", n_runs=35, get_precision="res-total"
 ):
     # Split measurements
-    odd_dataset, even_dataset = rsatoolbox.data.dataset.odd_even_split(
-        dataset, obs_desc
-    )
+    odd_dataset, even_dataset = dataset.odd_even_split(obs_desc)
 
     # Split residuals and get precision matrices
     if not isinstance(residuals, np.ndarray) or get_precision == "none":
@@ -141,8 +139,7 @@ def calc_precision(
     if get_precision == "res-total":
         precision = rsatoolbox.data.noise.prec_from_residuals(residuals, dof=None)
     if get_precision == "res-univariate":
-        sample_cov, _ = rsatoolbox.data.noise.sample_covariance(residuals)
-        precision = np.multiply(1 / sample_cov, np.identity(len(sample_cov)))
+        precision = rsatoolbox.data.noise.prec_from_residuals(residuals, method="diag")
     elif get_precision == "res-run-wise":
         runwise_residuals = runwise_split_residuals(residuals, n_runs=n_runs)
         precision = rsatoolbox.data.noise.prec_from_residuals(
@@ -156,109 +153,105 @@ def calc_precision(
 
 
 ###############################################################################
-
-# Set directories and specify ROIs
-ds_dir = "/moto/nklab/projects/ds001246/"
-n_subs = 5
-beta_type = "data_perm_mixed"
-estimate_rel = True
-oe_reliabilities = []
-precision_types = [
-    "none",
-    "instance-based",
-    "res-total",
-    "res-univariate",
-]  # opts: None, 'res-total', 'res-run-wise', 'instance-based', 'res-univariate'
-calculate_rdm = True
-remove_ds = True
-mask_dict = mask_utils.load_dict(
-    os.path.join(
-        ds_dir,
-        "derivatives",
-        "Masks",
-        "sub-" + str(1).zfill(2) + "_mask_dict_EPI_disjoint.npy",
+def main(sub=1):
+    # Set directories and specify ROIs
+    ds_dir = os.environ.get("SOURCE")
+    beta_type = "data_perm_mixed"
+    estimate_rel = False
+    precision_types = [
+        "none",
+        "instance-based",
+        "res-total",
+        "res-univariate",
+    ]  # opts: None, 'res-total', 'res-run-wise', 'instance-based', 'res-univariate'
+    calculate_rdm = True
+    remove_ds = True
+    mask_dict = mask_utils.load_dict(
+        os.path.join(
+            ds_dir,
+            "derivatives",
+            "Masks",
+            "sub-" + str(1).zfill(2) + "_mask_dict_EPI_disjoint.npy",
+        )
     )
-)
-roi_h_list = list(mask_dict.keys())
-label_dict = np.load(
-    os.path.join(ds_dir, "custom_synset_dictionary.npy"), allow_pickle="TRUE"
-).item()
-label2num = sort_invert_and_numerate_dict(label_dict)
-order = [
-    "n01443537",
-    "n01943899",
-    "n01976957",
-    "n02071294",  # water animals
-    "n01621127",
-    "n01846331",
-    "n01858441",
-    "n01677366",
-    "n02190790",
-    "n02274259",  # air and land animals (non-mammals)
-    "n02128385",
-    "n02139199",
-    "n02416519",
-    "n02437136",
-    "n02437971",  # land-Mammals
-    "n02951358",
-    "n03272010",
-    "n03482252",
-    "n03495258",  # humans in the picture
-    "n04254777",
-    "n03237416",
-    "n03124170",
-    "n03379051",
-    "n04572121",  # clothing
-    "n02824058",
-    "n02882301",
-    "n03345837",
-    "n04387400",
-    "n03716966",
-    "n03584254",
-    "n04533802",
-    "n03626115",
-    "n03941684",
-    "n03954393",
-    "n04507155",  # small, handy objects
-    "n02797295",
-    "n02690373",
-    "n02916179",
-    "n02950256",
-    "n03122295",
-    "n04252077",  # machines
-    "n03064758",
-    "n04210120",
-    "n04554684",
-    "n03452741",
-    "n03761084",  # large indoor objects
-    "n03710193",
-    "n03455488",
-    "n03767745",
-    "n04297750",
-]  # landmarks
+    roi_h_list = list(mask_dict.keys())
+    label_dict = np.load(
+        os.path.join(ds_dir, "custom_synset_dictionary.npy"), allow_pickle="TRUE"
+    ).item()
+    label2num = sort_invert_and_numerate_dict(label_dict)
+    order = [
+        "n01443537",
+        "n01943899",
+        "n01976957",
+        "n02071294",  # water animals
+        "n01621127",
+        "n01846331",
+        "n01858441",
+        "n01677366",
+        "n02190790",
+        "n02274259",  # air and land animals (non-mammals)
+        "n02128385",
+        "n02139199",
+        "n02416519",
+        "n02437136",
+        "n02437971",  # land-Mammals
+        "n02951358",
+        "n03272010",
+        "n03482252",
+        "n03495258",  # humans in the picture
+        "n04254777",
+        "n03237416",
+        "n03124170",
+        "n03379051",
+        "n04572121",  # clothing
+        "n02824058",
+        "n02882301",
+        "n03345837",
+        "n04387400",
+        "n03716966",
+        "n03584254",
+        "n04533802",
+        "n03626115",
+        "n03941684",
+        "n03954393",
+        "n04507155",  # small, handy objects
+        "n02797295",
+        "n02690373",
+        "n02916179",
+        "n02950256",
+        "n03122295",
+        "n04252077",  # machines
+        "n03064758",
+        "n04210120",
+        "n04554684",
+        "n03452741",
+        "n03761084",  # large indoor objects
+        "n03710193",
+        "n03455488",
+        "n03767745",
+        "n04297750",
+    ]  # landmarks
 
+    p = []  # Permutation vector
+    for i in range(len(order)):
+        p.append(label2num[label_dict[order[i]]])
+    p = np.array(p)
+    snr_range = [0.1, 1, 10]
+    run_subsets = [2 ** (i + 1) for i in range(5)]
 
-p = []  # Permutation vector
-for i in range(len(order)):
-    p.append(label2num[label_dict[order[i]]])
-p = np.array(p)
-snr_range = [0.1, 1, 10]
-run_subsets = [2 ** (i + 1) for i in range(5)]
-
-###############################################################################
-# sub = 5
-for sub in range(1, n_subs + 1):
+    ###############################################################################
+    # sub = 5
     rdms = []
 
     # Set subject-specific paths
     dataset_dir = os.path.join(
-        ds_dir, "derivatives", "PyRSA", "datasets", "sub-" + str(sub).zfill(2)
+        os.environ.get("INTERMEDIATE"), "PyRSA", "datasets", "sub-" + str(sub).zfill(2)
     )
     res_dir = os.path.join(
-        ds_dir, "derivatives", "PyRSA", "noise", "sub-" + str(sub).zfill(2)
+        os.environ.get("INTERMEDIATE"), "PyRSA", "noise", "sub-" + str(sub).zfill(2)
     )
     rdm_output_dir = os.path.join(
-        ds_dir, "derivatives", "PyRSA", "rdms", "sub-" + str(sub).zfill(2)
+        os.environ.get("INTERMEDIATE"), "PyRSA", "rdms", "sub-" + str(sub).zfill(2)
     )
     if not os.path.isdir(rdm_output_dir):
         os.makedirs(rdm_output_dir)
@@ -332,7 +325,7 @@ for sub in range(1, n_subs + 1):
                         if estimate_rel and n_runs > 2:
                             oe_reliability = oe_split_reliability(
                                 dataset,
-                                residuals=precision,
+                                residuals=residuals,
                                 obs_desc="run",
                                 n_runs=n_runs,
                                 get_precision=get_precision,
@@ -376,3 +369,14 @@ for sub in range(1, n_subs + 1):
         rdm_filename = os.path.join(rdm_output_dir, "RDM_" + beta_type)
         rdms.save(rdm_filename, file_type="hdf5", overwrite=True)
         print("Created subject RDM:", rdm_filename)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-s", "--sub", help="Subject to run [1..5]", type=int, default=1
+    )
+    args = parser.parse_args()
+    main(**vars(args))

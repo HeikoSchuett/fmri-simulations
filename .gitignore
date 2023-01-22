@@ -1,4 +1,6 @@
 spm12
 nifti_utils
-
-
+.DS_Store
+__pycache__
+tmp
+.vscode

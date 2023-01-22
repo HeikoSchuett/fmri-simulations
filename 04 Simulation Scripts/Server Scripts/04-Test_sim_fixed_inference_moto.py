@@ -12,14 +12,13 @@ import mask_utils
 import numpy as np
 import pandas as pd
 import rsatoolbox
+from rsatoolbox.util.inference_util import extract_variances
 
 
-def collect_RDMs(ds_dir, n_subs=1, source="PyRSA", beta_type=None):
+def collect_RDMs(n_subs=1, source="PyRSA", beta_type=None):
     roi_rdms = []
     for sub in range(1, n_subs + 1):
         fname = os.path.join(
-            ds_dir,
-            "derivatives",
             source,
             "rdms",
             "sub-" + str(sub).zfill(2),
@@ -48,7 +47,7 @@ def collect_model_rdms(rdms_full, rois, prec_type="none", method=None):
     return model_rdms
 
 
-def pattern_subset_rdms_sparse(model_rdms_full, data_rdms, n_stim):
+def pattern_subset_rdms_sparse(model_rdms_full, data_rdms, n_stim, permutation=None):
     model_rdms_list = []
     data_rdms_list = []
     factor_list = []
@@ -56,7 +55,12 @@ def pattern_subset_rdms_sparse(model_rdms_full, data_rdms, n_stim):
 
     for stim in n_stim:
         parts = partition_sets(n_cond, stim)
-        model_rdms_list.append(model_rdms_full.subset_pattern("index", parts[0]))
+        if permutation is not None:
+            rdms = model_rdms_full.subsample_pattern("index", permutation[parts[0]])
+            rdms.dissimilarities = np.nan_to_num(rdms.dissimilarities)
+            model_rdms_list.append(rdms)
+        else:
+            model_rdms_list.append(model_rdms_full.subset_pattern("index", parts[0]))
         data_rdms_list.append(data_rdms.subset_pattern("index", parts[0]))
         factor_list.append(np.array([stim]))
     factors = np.stack(factor_list, axis=1).T
@@ -65,7 +69,7 @@ def pattern_subset_rdms_sparse(model_rdms_full, data_rdms, n_stim):
 
 def partition_sets(n_cond, stim, sampling="random"):
     parts = []
-    lst = [i for i in range(n_cond)]
+    lst = list(range(n_cond))
     if sampling == "random":
         random.shuffle(lst)
 
@@ -87,40 +91,33 @@ def check_next_model_idx(winner_idx, model_names, gt_model, k):
     return tie_winner
 
 
-def results_summary(fixed_results, roi_h):
-    results = fixed_results.to_dict()
-    evaluations = results["evaluations"]
+def results_summary(results, roi_h):
+    evaluations = results.evaluations
     if len(evaluations.shape) > 2:
         evaluations = np.squeeze(np.transpose(evaluations, (2, 1, 0)), axis=None)
-    variances = results["variances"]
-    dof = results["dof"]
-    noise_ceiling = results["noise_ceiling"]
-    noise_ceil_var = results["noise_ceil_var"]
+    noise_ceiling = results.noise_ceiling
 
     # Names
-    model_names_tmp = list(results["models"].keys())
-    model_names = np.array(
-        [results["models"][i_model]["name"] for i_model in model_names_tmp]
-    )
+    model_names = [m.name for m in results.models]
     gt_model = roi_h
-    gt_model_idx = np.where(model_names == roi_h)[0][0]
+    gt_model_idx = np.where(np.array(model_names) == roi_h)[0][0]
 
     # Determine winner model
     point_estimators = np.nanmean(evaluations, axis=0)
     standard_deviations = np.nanstd(evaluations, axis=0)
     best = np.max(point_estimators)
-    winner_idx = np.where(point_estimators == best)
+    winner_idx = np.where(point_estimators == best)[0]
 
     if len(winner_idx) > 1:  # handle ties
         winner_idx_tmp = check_next_model_idx(winner_idx, model_names, gt_model, 0)
-        winner_idx = winner_idx_tmp
+        winner_idx = np.array(winner_idx_tmp)
 
-    winner_model = model_names[winner_idx]
+    winner_model = model_names[winner_idx[0]]
     recovery = winner_model == gt_model
 
     # Significance testing
-    p_values = rsatoolbox.util.inference_util.t_tests(evaluations, variances, dof)
-    significance = fdr_control(p_values, alpha=0.05)
+    p_pairwise, p_zero, p_noise = results.test_all()
+    significance = fdr_control(p_pairwise, alpha=0.05)
     better = significance[gt_model_idx, :]
 
     # Noise ceiling tests
@@ -129,18 +126,18 @@ def results_summary(fixed_results, roi_h):
     else:
         noise_ceilings = noise_ceiling
     above_nc = best > noise_ceilings[0]
-    p = rsatoolbox.util.inference_util.t_test_nc(
-        evaluations, variances, noise_ceilings[0], noise_ceil_var[:, 0], dof
-    )
-    nc_significance = p[gt_model_idx]
+    # p = rsatoolbox.util.inference_util.t_test_nc(
+    #    evaluations, variances, noise_ceilings[0], noise_ceil_var[:, 0], dof
+    # )
+    nc_significance = p_noise[gt_model_idx]
 
     # Putting everything together
     summary = {
         "GT": str(gt_model),
-        "winner": str(winner_model[0]),
+        "winner": str(winner_model),
         "point_est": point_estimators[winner_idx],
         "std": standard_deviations[winner_idx],
-        "recovered": int(recovery[0]),
+        "recovered": int(recovery),
         "n_sig_better": sum(better),
         "nc_low": noise_ceilings[0],
         "nc_high": noise_ceilings[1],
@@ -167,162 +164,198 @@ def fdr_control(p_values, alpha=0.05):
     return significant
 
 
-###############################################################################
+def main():
+    ###############################################################################
+    out_dir = os.path.join(os.environ["SOURCE"], "derivatives", "results")
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+    # Set directories and specify ROIs
+    ds_dir = os.environ["SOURCE"]
+    n_subs = 5
+    # directory in which subject-specific volumetric ROI masks are saved by FS
+    freesurfer_mri = "mri_glasser"
+    mask_dir = os.path.join(
+        ds_dir, "derivatives", "freesurfer", "sub-" + str(1).zfill(2), freesurfer_mri
+    )
+    mask_dict = mask_utils.load_dict(
+        os.path.join(mask_dir, "sub-" + str(1).zfill(2) + "_mask_dict_EPI_disjoint.npy")
+    )
+    roi_h_list = list(mask_dict.keys())
+    mask_dict = None
+    n_stim = [5, 10, 20, 30, 50]
+    comp_methods = ["cosine_cov", "cosine"]
 
-# Set directories and specify ROIs
-ds_dir = "/moto/nklab/projects/ds001246/"
-n_subs = 5
-# directory in which subject-specific volumetric ROI masks are saved by FS
-freesurfer_mri = "mri_glasser"
-mask_dir = os.path.join(
-    ds_dir, "derivatives", "freesurfer", "sub-" + str(1).zfill(2), freesurfer_mri
-)
-mask_dict = mask_utils.load_dict(
-    os.path.join(mask_dir, "sub-" + str(1).zfill(2) + "_mask_dict_EPI_disjoint.npy")
-)
-roi_h_list = list(mask_dict.keys())
-mask_dict = None
-n_stim = [5, 10, 20, 30, 50]
-comp_methods = ["cosine_cov", "cosine"]
-###############################################################################
-results_list = []
-df = pd.DataFrame()
-df_idx = -1
+    # load permutation
+    permutations = np.loadtxt(
+        os.path.join(os.environ.get("INTERMEDIATE"), "perms.csv"),
+        delimiter=",",
+        dtype=int,
+    )
+    ###############################################################################
+    results_list = []
+    df = pd.DataFrame()
+    df_idx = -1
 
-rdms = collect_RDMs(ds_dir, n_subs=n_subs, source="PyRSA", beta_type="data_perm_mixed")
-prec_types = np.unique(rdms.rdm_descriptors["prec_type"])
-run_subsets = np.unique(rdms.rdm_descriptors["n_runs"])
-snr_range = np.unique(rdms.rdm_descriptors["snr_rel"])
-perms_range = np.unique(rdms.rdm_descriptors["perm"])
-signal_rdms = collect_RDMs(ds_dir, n_subs=n_subs, source="PyRSA_GT", beta_type="signal")
+    rdms = collect_RDMs(
+        n_subs=n_subs,
+        source=os.path.join(os.environ.get("INTERMEDIATE"), "PyRSA"),
+        beta_type="data_perm_mixed",
+    )
+    rdms.pattern_descriptors["index"] = np.array(
+        [int(i) for i in rdms.pattern_descriptors["index"]]
+    )
+    prec_types = np.unique(rdms.rdm_descriptors["prec_type"])
+    run_subsets = np.unique(rdms.rdm_descriptors["n_runs"])
+    snr_range = np.unique(rdms.rdm_descriptors["snr_rel"])
+    perms_range = np.unique(rdms.rdm_descriptors["perm"])
+    signal_rdms = collect_RDMs(
+        n_subs=n_subs,
+        source=os.path.join(os.environ.get("SOURCE"), "derivatives", "PyRSA_GT"),
+        beta_type="signal",
+    )
+    signal_rdms.pattern_descriptors["index"] = np.array(
+        [int(i) for i in signal_rdms.pattern_descriptors["index"]]
+    )
 
+    # method = 'cosine'
+    for method in comp_methods:
+        # prec_type = 'res-total'
+        for prec_type in prec_types:
+            # for prec_type in ["res-total"]:
+            print(f"Starting inference for {method}:{prec_type}")
+            # Collect full model RDMs (pooled according to precision type and comparison method)
+            model_rdms_full = collect_model_rdms(
+                signal_rdms, roi_h_list, prec_type=prec_type, method=method
+            )
+            # roi_h = 'V1_left'
+            for roi_h in roi_h_list:
+                # snr = 1
+                for snr in snr_range:
+                    # perm = 1
+                    for perm in perms_range:
+                        # n_runs = 32
+                        for n_runs in run_subsets:
+                            summary = {}
+                            model_rdms_list, data_rdms_list = [], []
 
-# method = 'cosine'
-for method in comp_methods:
-    # prec_type = 'instance-based'
-    for prec_type in prec_types:
-        # Collect full model RDMs (pooled according to precision type and comparison method)
-        model_rdms_full = collect_model_rdms(
-            signal_rdms, roi_h_list, prec_type=prec_type, method=method
-        )
-        # roi_h = 'V1_left'
-        for roi_h in roi_h_list:
-            # snr = 1
-            for snr in snr_range:
-                # perm = 1
-                for perm in perms_range:
-                    # n_runs = 32
-                    for n_runs in run_subsets:
-                        summary = {}
-                        model_rdms_list, data_rdms_list = [], []
-
-                        # Collect data RDMs
-                        data_rdms = (
-                            rdms.subset("prec_type", prec_type)
-                            .subset("snr_rel", snr)
-                            .subset("perm", perm)
-                            .subset("n_runs", n_runs)
-                            .subset("roi", roi_h)
-                        )
-
-                        # Pattern subset model RDMs
-                        (
-                            model_rdms_list,
-                            data_rdms_list,
-                            factors,
-                        ) = pattern_subset_rdms_sparse(
-                            model_rdms_full, data_rdms, n_stim
-                        )
-                        n_subsets = len(model_rdms_list)
-
-                        # Do fixed inference for each subset
-                        # comb = 0
-                        for comb in range(n_subsets):
-                            fixed_models = []
-                            fixed_results = []
-                            model_rdms = model_rdms_list[comb]
-                            data_rdms_sub = data_rdms_list[comb]
-
-                            # Model selection
-                            for i_model in roi_h_list:
-                                fixed_models.append(
-                                    rsatoolbox.model.ModelFixed(
-                                        i_model, model_rdms.subset("roi", i_model)
-                                    )
-                                )
-
-                            # ModelFixed class rearranges pattern descriptor indices, and
-                            # we need to redo this for data_rdms_sub, otherwise
-                            # eval_bootstrap_pattern will throw up an exception
-                            data_rdms_sub.pattern_descriptors["index"] = np.arange(
-                                data_rdms_sub.n_cond
+                            # Collect data RDMs
+                            data_rdms = (
+                                rdms.subset("prec_type", prec_type)
+                                .subset("snr_rel", snr)
+                                .subset("perm", perm)
+                                .subset("n_runs", n_runs)
+                                .subset("roi", roi_h)
                             )
 
-                            # Perform fixed inference
-                            if method == "cosine_cov":
-                                fixed_results = rsatoolbox.inference.eval_fixed(
-                                    fixed_models, data_rdms_sub, method=method
+                            # Pattern subset model RDMs
+                            (
+                                model_rdms_list,
+                                data_rdms_list,
+                                factors,
+                            ) = pattern_subset_rdms_sparse(
+                                model_rdms_full,
+                                data_rdms,
+                                n_stim,
+                                permutation=permutations[:, perm - 1],
+                            )
+                            n_subsets = len(model_rdms_list)
+
+                            # Do fixed inference for each subset
+                            # comb = 0
+                            for comb in range(n_subsets):
+                                fixed_models = []
+                                fixed_results = []
+                                model_rdms = model_rdms_list[comb]
+                                data_rdms_sub = data_rdms_list[comb]
+
+                                # Model selection
+                                for i_model in roi_h_list:
+                                    fixed_models.append(
+                                        rsatoolbox.model.ModelFixed(
+                                            i_model, model_rdms.subset("roi", i_model)
+                                        )
+                                    )
+
+                                # ModelFixed class rearranges pattern descriptor indices, and
+                                # we need to redo this for data_rdms_sub, otherwise
+                                # eval_bootstrap_pattern will throw up an exception
+                                data_rdms_sub.pattern_descriptors["index"] = np.arange(
+                                    data_rdms_sub.n_cond
                                 )
-                            else:  # with bootstrapping
-                                fixed_results = (
-                                    rsatoolbox.inference.eval_bootstrap_pattern(
+
+                                # Perform fixed inference
+                                if method == "cosine_cov":
+                                    fixed_results = rsatoolbox.inference.eval_fixed(
                                         fixed_models, data_rdms_sub, method=method
                                     )
-                                )
+                                else:  # with bootstrapping
+                                    fixed_results = (
+                                        rsatoolbox.inference.eval_bootstrap_pattern(
+                                            fixed_models, data_rdms_sub, method=method
+                                        )
+                                    )
 
-                            # rsatoolbox.vis.plot_model_comparison(fixed_results)
-                            summary = results_summary(fixed_results, roi_h)
-                            oe = dict(
-                                zip(
-                                    [
-                                        "sub-"
-                                        + str(i + 1).zfill(2)
-                                        + "_data_rdm_oe_rel"
-                                        for i in range(data_rdms_sub.n_rdm)
-                                    ],
-                                    data_rdms_sub.rdm_descriptors["oe_rel"],
+                                # rsatoolbox.vis.plot_model_comparison(fixed_results)
+                                summary = results_summary(fixed_results, roi_h)
+                                oe = dict(
+                                    zip(
+                                        [
+                                            "sub-"
+                                            + str(i + 1).zfill(2)
+                                            + "_data_rdm_oe_rel"
+                                            for i in range(data_rdms_sub.n_rdm)
+                                        ],
+                                        data_rdms_sub.rdm_descriptors["oe_rel"],
+                                    )
                                 )
-                            )
-                            roi_size = dict(
-                                zip(
-                                    [
-                                        "sub-" + str(i + 1).zfill(2) + "_GT_roi_size"
-                                        for i in range(data_rdms_sub.n_rdm)
-                                    ],
-                                    data_rdms_sub.rdm_descriptors["roi_size"],
+                                roi_size = dict(
+                                    zip(
+                                        [
+                                            "sub-"
+                                            + str(i + 1).zfill(2)
+                                            + "_GT_roi_size"
+                                            for i in range(data_rdms_sub.n_rdm)
+                                        ],
+                                        data_rdms_sub.rdm_descriptors["roi_size"],
+                                    )
                                 )
-                            )
-                            for multi in [oe, roi_size]:
-                                summary.update(multi)
-                            summary.update(
-                                {
-                                    "comparison_method": method,
-                                    "pattern_subset": int(factors[comb]),
-                                    "prec_type": prec_type,
-                                    "snr_rel": snr,
-                                    "perm_num": perm,
-                                    "n_runs": n_runs,
-                                }
-                            )
-                            df_idx += 1
-                            summary_df = pd.DataFrame(summary, index=[df_idx])
-                            df = df.append(summary_df)
-                            results_list.append(fixed_results)
+                                for multi in [oe, roi_size]:
+                                    summary.update(multi)
+                                summary.update(
+                                    {
+                                        "comparison_method": method,
+                                        "pattern_subset": int(factors[comb]),
+                                        "prec_type": prec_type,
+                                        "snr_rel": snr,
+                                        "perm_num": perm,
+                                        "n_runs": n_runs,
+                                    }
+                                )
+                                df_idx += 1
+                                summary_df = pd.DataFrame(summary, index=[df_idx])
+                                df = pd.concat([df, summary_df])
+                                results_list.append(fixed_results)
 
-    csv_fname = (
-        os.getcwd()
-        + os.sep
-        + "results_"
-        + strftime("%Y-%m-%d_%H-%M", gmtime())
-        + ".csv"
+    csv_fname = os.path.join(
+        os.environ["SOURCE"],
+        "derivatives",
+        "results",
+        "results_" + strftime("%Y-%m-%d_%H-%M", gmtime()) + ".csv",
     )
     df.to_csv(csv_fname)
-    npy_fname = (
-        os.getcwd()
-        + os.sep
-        + "results_"
-        + strftime("%Y-%m-%d_%H-%M", gmtime())
-        + ".npy"
+    npy_fname = os.path.join(
+        os.environ["SOURCE"],
+        "derivatives",
+        "results",
+        "results_" + strftime("%Y-%m-%d_%H-%M", gmtime()) + ".npy",
     )
     np.save(npy_fname, results_list)
     # df_2 = pd.read_csv(csv_fname, index_col=0)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    args = parser.parse_args()
+    main(**vars(args))

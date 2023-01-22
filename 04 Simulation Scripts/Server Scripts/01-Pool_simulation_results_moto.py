@@ -121,7 +121,7 @@ def pooled_sim_residuals_pipeline(sub, spm_dir, spm_type, ses_type, snr=1, perm=
             for res in range(1, n_res + 1):
                 res_image_path = os.path.join(glm_dir, "Res_" + str(res).zfill(4))
                 res_image = nifti1.load(res_image_path)
-                residual_array_superset.append(res_image.get_fdata())
+                residual_array_superset.append(np.array(res_image.get_fdata()))
                 fourth_dimension_descriptors_r.append(
                     str(res).zfill(4) + "_" + str(run_counter)
                 )
@@ -137,27 +137,26 @@ def pooled_sim_residuals_pipeline(sub, spm_dir, spm_type, ses_type, snr=1, perm=
 ##############################################################################
 
 
-# Data analysis parameters
-processing_mode = "both"  # Options: 'datasets', 'residuals' or 'both'
-spm_type = "Data_perm"
-task = "perception"
-stimulus_set = "Test"
-ses_type = "ses-" + task + stimulus_set
-first_n_betas = 50
-save_dataset = False
-snr_range = [0.1, 1, 10]
-n_perms = 1
-delete_inputs = True
+def main(sub=1):
+    # Data analysis parameters
+    processing_mode = "both"  # Options: 'datasets', 'residuals' or 'both'
+    spm_type = "Data_perm"
+    task = "perception"
+    stimulus_set = "Test"
+    ses_type = "ses-" + task + stimulus_set
+    first_n_betas = 50
+    save_dataset = False
+    snr_range = [0.1, 1, 10]
+    n_perms = 1
+    delete_inputs = True
 
-# Set directories, specify ROIs and load dictionary for labels
-ds_dir = "/moto/nklab/projects/ds001246/"
-spm_dir = os.path.join(ds_dir, "derivatives", spm_type)
-spm_dir = "/tmp/glm/"
-n_subs = len(glob.glob(ds_dir + os.sep + "sub*"))
+    # Set directories, specify ROIs and load dictionary for labels
+    ds_dir = os.environ.get("SOURCE")
+    # spm_dir = os.path.join(ds_dir, "derivatives", spm_type)
+    spm_dir = os.path.join(os.environ.get("INTERMEDIATE"), spm_type)
+    n_subs = len(glob.glob(ds_dir + os.sep + "sub*"))
 
-##############################################################################
-
-for sub in range(1, n_subs + 1):
+    ##############################################################################
 
     img_output_dir = os.path.join(spm_dir, "sub-" + str(sub).zfill(2))
     perm_range = get_perm_range(img_output_dir, ses_type)
@@ -264,3 +263,14 @@ for sub in range(1, n_subs + 1):
         )
         for d in to_be_deleted:
             shutil.rmtree(d)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-s", "--sub", help="Subject to run [1..5]", type=int, default=1
+    )
+    args = parser.parse_args()
+    main(**vars(args))

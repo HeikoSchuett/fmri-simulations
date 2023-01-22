@@ -6,6 +6,6 @@ function Dirs = parse_bids_base_name(Dirs, name)
     end
     Dirs.n_subs = length(Dirs.sub_list);
     suffix = '';
-    Dirs.outputdir = fullfile(Dirs.BIDSdir, 'derivatives',strcat(name, suffix));
+    Dirs.outputdir = fullfile(Dirs.BIDSdir, 'derivatives', strcat(name, suffix));
     spm_mkdir(Dirs.outputdir,strcat('sub-', char(Dirs.sub_list)));
 end

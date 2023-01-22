@@ -248,43 +248,39 @@ def remove_empty_voxels_pipeline(
 ###############################################################################
 
 
-# Data analysis parameters
-processing_mode = "both"  # Options: 'datasets', 'residuals' or 'both'
-spm_type = "Data_perm"
-task = "perception"
-stimulus_set = "Test"
-ses_type = "ses-" + task + stimulus_set
-estimate_cronbach = False
-cronbachs_list = []
-save_dataset = True
-snr_range = [0.1, 1, 10]
-delete_inputs = True
+def main(sub=1):
+    # Data analysis parameters
+    processing_mode = "both"  # Options: 'datasets', 'residuals' or 'both'
+    spm_type = "Data_perm"
+    task = "perception"
+    stimulus_set = "Test"
+    ses_type = "ses-" + task + stimulus_set
+    estimate_cronbach = False
+    cronbachs_list = []
+    save_dataset = True
+    snr_range = [0.1, 1, 10]
+    delete_inputs = True
 
-# Set directories, specify ROIs and load dictionary for labels
-ds_dir = "/moto/nklab/projects/ds001246/"
-# directory of mask descriptors
-txt_dir = os.path.join(ds_dir, "HCP-MMP1_on_MNI152_ICBM2009a_nlin.txt")
-spm_dir = os.path.join(ds_dir, "derivatives", spm_type)
-# directory in which subject-specific volumetric ROI masks are saved by FS
-mask_dir = os.path.join(ds_dir, "derivatives", "Masks")
-label_dict = np.load(
-    os.path.join(ds_dir, "custom_synset_dictionary.npy"), allow_pickle="TRUE"
-).item()
-n_subs = len(glob.glob(spm_dir + os.sep + "sub*"))
+    # Set directories, specify ROIs and load dictionary for labels
+    ds_dir = os.environ.get("SOURCE")
+    # directory of mask descriptors
+    txt_dir = os.path.join(ds_dir, "HCP-MMP1_on_MNI152_ICBM2009a_nlin.txt")
+    spm_dir = os.path.join(os.environ.get("INTERMEDIATE"), spm_type)
+    # directory in which subject-specific volumetric ROI masks are saved by FS
+    mask_dir = os.path.join(ds_dir, "derivatives", "Masks")
+    label_dict = np.load(
+        os.path.join(ds_dir, "custom_synset_dictionary.npy"), allow_pickle="TRUE"
+    ).item()
 
-
-##############################################################################
-
-for sub in range(1, n_subs + 1):
-
+    ##############################################################################
     # Set output directories
     ds_output_dir = os.path.join(
-        ds_dir, "derivatives", "PyRSA", "datasets", "sub-" + str(sub).zfill(2)
+        os.environ.get("INTERMEDIATE"), "PyRSA", "datasets", "sub-" + str(sub).zfill(2)
     )
     if not os.path.isdir(ds_output_dir):
         os.makedirs(ds_output_dir)
     res_output_dir = os.path.join(
-        ds_dir, "derivatives", "PyRSA", "noise", "sub-" + str(sub).zfill(2)
+        os.environ.get("INTERMEDIATE"), "PyRSA", "noise", "sub-" + str(sub).zfill(2)
     )
     if not os.path.isdir(res_output_dir):
         os.makedirs(res_output_dir)
@@ -446,3 +442,14 @@ for sub in range(1, n_subs + 1):
 
     if delete_inputs:
         shutil.rmtree(glm_dir)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-s", "--sub", help="Subject to run [1..5]", type=int, default=1
+    )
+    args = parser.parse_args()
+    main(**vars(args))

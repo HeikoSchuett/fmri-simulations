@@ -28,13 +28,12 @@ function level_1_GLM(nii_file, i, s, n, p, snr, Dirs, Opts)
     spm_specify.matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [0 0]; 
     spm_specify.matlabbatch{1}.spm.stats.fmri_spec.volt = 1;
     spm_specify.matlabbatch{1}.spm.stats.fmri_spec.global = 'None';
-    spm_specify.matlabbatch{1}.spm.stats.fmri_spec.cvi = 'AR(1)'; 
-    spm_jobman('run', spm_specify.matlabbatch)
+    spm_specify.matlabbatch{1}.spm.stats.fmri_spec.cvi = 'AR(1)';
+    %spm_jobman('run', spm_specify.matlabbatch)
 
     % Model estimation
-    spm_estimate = struct();
-    spm_estimate.matlabbatch{1}.spm.stats.fmri_est.spmmat(1) = {[Dirs.results_dir filesep 'SPM.mat']};  
-    spm_estimate.matlabbatch{1}.spm.stats.fmri_est.write_residuals = 1; % write_residuals                
-    spm_estimate.matlabbatch{1}.spm.stats.fmri_est.method.Classical = 1; % ReML
-    spm_jobman('run',spm_estimate.matlabbatch)
+    spm_specify.matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = {[Dirs.results_dir filesep 'SPM.mat']};  
+    spm_specify.matlabbatch{2}.spm.stats.fmri_est.write_residuals = 1; % write_residuals                
+    spm_specify.matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1; % ReML
+    spm_jobman('run',spm_specify.matlabbatch)
 end
