@@ -105,12 +105,14 @@ def results_summary(results, roi_h):
     # Determine winner model
     point_estimators = np.nanmean(evaluations, axis=0)
     standard_deviations = np.nanstd(evaluations, axis=0)
-    best = np.max(point_estimators)
+    best = np.nanmax(point_estimators)
     winner_idx = np.where(point_estimators == best)[0]
 
     if len(winner_idx) > 1:  # handle ties
         winner_idx_tmp = check_next_model_idx(winner_idx, model_names, gt_model, 0)
         winner_idx = np.array(winner_idx_tmp)
+    elif len(winner_idx) == 0:
+        winner_idx = np.array([0])
 
     winner_model = model_names[winner_idx[0]]
     recovery = winner_model == gt_model
