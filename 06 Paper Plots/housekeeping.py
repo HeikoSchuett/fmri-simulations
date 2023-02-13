@@ -15,7 +15,7 @@ results_folder = os.path.join(os.environ["SOURCE"], "derivatives", "results/")
 
 
 def generic_lables(results_folder=results_folder):
-    csv_list = glob.glob(results_folder + "*.csv")
+    csv_list = glob.glob(results_folder + "results*.csv")
     csv_list.sort()
     full_csv = pd.read_csv(csv_list[0], index_col=0)
     full_csv["nsf"] = 1 / full_csv["snr_rel"]
@@ -34,7 +34,7 @@ def generic_lables(results_folder=results_folder):
 
 
 def extract_stats(results_folder=results_folder, perm_idx=None):
-    npy_list = glob.glob(results_folder + "*.npy")
+    npy_list = glob.glob(results_folder + "results*.npy")
     npy_list.sort()
     means_superset = []
     stds_superset = []
