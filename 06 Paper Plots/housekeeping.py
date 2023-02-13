@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import os
 
-results_folder = os.path.join(os.environ["SOURCE"], "derivatives", "results")
+results_folder = os.path.join(os.environ["SOURCE"], "derivatives", "results/")
 
 
 def generic_lables(results_folder=results_folder):
