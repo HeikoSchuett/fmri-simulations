@@ -46,8 +46,8 @@ def extract_stats(results_folder=results_folder, perm_idx=None):
         full_npy_tmp = np.load(npy_file, allow_pickle=True)
 
         for i in range(len(full_npy_tmp)):
-            means_list.append(np.nanmean(full_npy_tmp[i].evaluations, axis=0))
-            stds_list.append(full_npy_tmp[i].variances)
+            means_list.append(full_npy_tmp[i].get_means())
+            stds_list.append(full_npy_tmp[i].get_model_var())
 
         del full_npy_tmp
         means_stacked = np.stack(means_list, axis=0)
