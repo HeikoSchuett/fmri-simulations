@@ -8,11 +8,65 @@ Pipeline for testing inference on average ground truth RDM
 import os
 import random
 from time import gmtime, strftime
+from copy import deepcopy
 import mask_utils
 import numpy as np
 import pandas as pd
 import rsatoolbox
-from rsatoolbox.util.inference_util import extract_variances
+
+# unused now to get correspondence to permutation right
+order = [
+    "n01443537",
+    "n01943899",
+    "n01976957",
+    "n02071294",  # water animals
+    "n01621127",
+    "n01846331",
+    "n01858441",
+    "n01677366",
+    "n02190790",
+    "n02274259",  # air and land animals (non-mammals)
+    "n02128385",
+    "n02139199",
+    "n02416519",
+    "n02437136",
+    "n02437971",  # land-Mammals
+    "n02951358",
+    "n03272010",
+    "n03482252",
+    "n03495258",  # humans in the picture
+    "n04254777",
+    "n03237416",
+    "n03124170",
+    "n03379051",
+    "n04572121",  # clothing
+    "n02824058",
+    "n02882301",
+    "n03345837",
+    "n04387400",
+    "n03716966",
+    "n03584254",
+    "n04533802",
+    "n03626115",
+    "n03941684",
+    "n03954393",
+    "n04507155",  # small, handy objects
+    "n02797295",
+    "n02690373",
+    "n02916179",
+    "n02950256",
+    "n03122295",
+    "n04252077",  # machines
+    "n03064758",
+    "n04210120",
+    "n04554684",
+    "n03452741",
+    "n03761084",  # large indoor objects
+    "n03710193",
+    "n03455488",
+    "n03767745",
+    "n04297750",
+]  # landmarks
 
 
 def collect_RDMs(n_subs=1, source="PyRSA", beta_type=None):
@@ -53,14 +107,19 @@ def pattern_subset_rdms_sparse(model_rdms_full, data_rdms, n_stim, permutation=N
     factor_list = []
     n_cond = model_rdms_full.n_cond
 
+    if permutation is not None:
+        # subsampling orders the permutation
+        # to match the data rdms we reverse this
+        o = np.argsort(permutation)
+        o_inv = np.empty_like(o)
+        o_inv[o] = np.arange(len(o_inv))
+        model_rdms_full = model_rdms_full.subsample_pattern("index", permutation - 1)
+        model_rdms_full.dissimilarities = np.nan_to_num(model_rdms_full.dissimilarities)
+        model_rdms_full.reorder(o_inv)
+        model_rdms_full.pattern_descriptors["index"] = np.arange(n_cond)
     for stim in n_stim:
         parts = partition_sets(n_cond, stim)
-        if permutation is not None:
-            rdms = model_rdms_full.subsample_pattern("index", permutation[parts[0]])
-            rdms.dissimilarities = np.nan_to_num(rdms.dissimilarities)
-            model_rdms_list.append(rdms)
-        else:
-            model_rdms_list.append(model_rdms_full.subset_pattern("index", parts[0]))
+        model_rdms_list.append(model_rdms_full.subset_pattern("index", parts[0]))
         data_rdms_list.append(data_rdms.subset_pattern("index", parts[0]))
         factor_list.append(np.array([stim]))
     factors = np.stack(factor_list, axis=1).T
@@ -74,7 +133,7 @@ def partition_sets(n_cond, stim, sampling="random"):
         random.shuffle(lst)
 
     for i in range(0, n_cond, stim):
-        parts.append(lst[i : i + stim])
+        parts.append(lst[i : (i + stim)])
 
     return parts
 
@@ -184,8 +243,8 @@ def main():
     )
     roi_h_list = list(mask_dict.keys())
     mask_dict = None
-    n_stim = [5, 10, 20, 30, 50]
-    comp_methods = ["cosine_cov", "cosine"]
+    n_stim = np.flip([5, 10, 20, 30, 50])
+    comp_methods = ["corr", "cosine_cov", "cosine"]
 
     # load permutation
     permutations = np.loadtxt(
@@ -207,18 +266,20 @@ def main():
         [int(i) for i in rdms.pattern_descriptors["index"]]
     )
     prec_types = np.unique(rdms.rdm_descriptors["prec_type"])
-    run_subsets = np.unique(rdms.rdm_descriptors["n_runs"])
-    snr_range = np.unique(rdms.rdm_descriptors["snr_rel"])
+    run_subsets = np.flip(np.unique(rdms.rdm_descriptors["n_runs"]))
+    snr_range = np.flip(np.unique(rdms.rdm_descriptors["snr_rel"]))
     perms_range = np.unique(rdms.rdm_descriptors["perm"])
     signal_rdms = collect_RDMs(
         n_subs=n_subs,
         source=os.path.join(os.environ.get("SOURCE"), "derivatives", "PyRSA_GT"),
         beta_type="signal",
     )
-    signal_rdms.pattern_descriptors["index"] = np.array(
-        [int(i) for i in signal_rdms.pattern_descriptors["index"]]
-    )
-
+    # puts model RDMs back into SPM order (nXX)
+    signal_rdms.sort_by(synset="alpha")
+    rdms.sort_by(synset="alpha")
+    signal_rdms.pattern_descriptors["index"] = np.arange(signal_rdms.n_cond)
+    rdms.pattern_descriptors["index"] = np.arange(rdms.n_cond)
+    assert signal_rdms.pattern_descriptors["stim"] == rdms.pattern_descriptors["stim"]
     # method = 'cosine'
     for method in comp_methods:
         # prec_type = 'res-total'
@@ -238,7 +299,6 @@ def main():
                         # n_runs = 32
                         for n_runs in run_subsets:
                             summary = {}
-                            model_rdms_list, data_rdms_list = [], []
 
                             # Collect data RDMs
                             data_rdms = (
@@ -249,6 +309,10 @@ def main():
                                 .subset("roi", roi_h)
                             )
 
+                            if permutations.ndim == 1:
+                                i_perm = permutations
+                            else:
+                                i_perm = permutations[:, perm - 1]
                             # Pattern subset model RDMs
                             (
                                 model_rdms_list,
@@ -258,7 +322,7 @@ def main():
                                 model_rdms_full,
                                 data_rdms,
                                 n_stim,
-                                permutation=permutations[:, perm - 1],
+                                permutation=i_perm,
                             )
                             n_subsets = len(model_rdms_list)
 
@@ -285,17 +349,12 @@ def main():
                                     data_rdms_sub.n_cond
                                 )
 
-                                # Perform fixed inference
-                                if method == "cosine_cov":
-                                    fixed_results = rsatoolbox.inference.eval_fixed(
+                                # Perform inference
+                                fixed_results = (
+                                    rsatoolbox.inference.eval_bootstrap_pattern(
                                         fixed_models, data_rdms_sub, method=method
                                     )
-                                else:  # with bootstrapping
-                                    fixed_results = (
-                                        rsatoolbox.inference.eval_bootstrap_pattern(
-                                            fixed_models, data_rdms_sub, method=method
-                                        )
-                                    )
+                                )
 
                                 # rsatoolbox.vis.plot_model_comparison(fixed_results)
                                 summary = results_summary(fixed_results, roi_h)

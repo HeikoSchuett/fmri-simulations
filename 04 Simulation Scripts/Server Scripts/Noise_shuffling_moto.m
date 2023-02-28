@@ -15,7 +15,7 @@ addpath(fullfile(matlab_docs, 'spm12'));
 addpath(fullfile(matlab_docs, 'Simulation_Utils')); 
 
 Opts = struct();
-Opts.n_permutations = 2;
+Opts.n_permutations = 1;
 Opts.ar_n = 2;
 Opts.task = 'perception';
 Opts.subtask = 'Test';
@@ -32,7 +32,7 @@ Dirs.permfile = fullfile(getenv('INTERMEDIATE'), 'perms.csv');
 if isfile(Dirs.permfile)
     perm = csvread(Dirs.permfile);
 else
-    perm = randi(Opts.n_stim_betas, Opts.n_stim_betas, 2);
+    perm = randi(Opts.n_stim_betas, Opts.n_stim_betas, 1);
     csvwrite(Dirs.permfile, perm);
 end
 
