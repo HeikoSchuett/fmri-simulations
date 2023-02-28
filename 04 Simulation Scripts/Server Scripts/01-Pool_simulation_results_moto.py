@@ -53,7 +53,7 @@ def convert_to_synset(stim_ids):
 
 
 def pooled_sim_betas_pipeline(
-    sub, spm_dir, spm_type, ses_type, snr=1, perm=1, first_n_betas=None
+    sub, spm_dir, ses_type, snr=1, perm=1, first_n_betas=None
 ):
     run_counter = 0
     fourth_dimension_descriptors = []
@@ -63,18 +63,21 @@ def pooled_sim_betas_pipeline(
     )
 
     for ses in range(1, n_ses + 1):
-        run_dir = os.path.join(
+        ses_dir = os.path.join(
             spm_dir, "sub-" + str(sub).zfill(2), ses_type + str(ses).zfill(2)
         )
-        n_runs = len(glob.glob(run_dir + os.sep + "run*"))
+        n_runs = len(glob.glob(ses_dir + os.sep + "run*"))
 
         for run in range(1, n_runs + 1):
             run_counter += 1
-            glm_dir = os.path.join(
-                run_dir,
-                "run-" + str(run).zfill(2),
-                "GLM_Data_perm_mixed_" + str(perm).zfill(4) + "_snr_" + str(snr),
-            )
+            if perm is None:
+                glm_dir = os.path.join(ses_dir, "run-" + str(run).zfill(2))
+            else:
+                glm_dir = os.path.join(
+                    ses_dir,
+                    "run-" + str(run).zfill(2),
+                    "GLM_Data_perm_mixed_" + str(perm).zfill(4) + "_snr_" + str(snr),
+                )
             beta_descriptors_path = os.path.join(glm_dir, "spm_beta_ids.txt")
             stim_ids_dict = load_stim_ids_dict(
                 beta_descriptors_path, first_n_betas=first_n_betas, tosynset=True
@@ -96,7 +99,7 @@ def pooled_sim_betas_pipeline(
     return pooled_beta_array, generic_affine, fourth_dimension_descriptors
 
 
-def pooled_sim_residuals_pipeline(sub, spm_dir, spm_type, ses_type, snr=1, perm=1):
+def pooled_sim_residuals_pipeline(sub, spm_dir, ses_type, snr=1, perm=1):
     run_counter = 0
     fourth_dimension_descriptors_r = []
     residual_array_superset = []
@@ -105,18 +108,22 @@ def pooled_sim_residuals_pipeline(sub, spm_dir, spm_type, ses_type, snr=1, perm=
     )
 
     for ses in range(1, n_ses + 1):
-        run_dir = os.path.join(
+        ses_dir = os.path.join(
             spm_dir, "sub-" + str(sub).zfill(2), ses_type + str(ses).zfill(2)
         )
-        n_runs = len(glob.glob(run_dir + os.sep + "run*"))
+        n_runs = len(glob.glob(ses_dir + os.sep + "run*"))
 
         for run in range(1, n_runs + 1):
             run_counter += 1
-            glm_dir = os.path.join(
-                run_dir,
-                "run-" + str(run).zfill(2),
-                "GLM_Data_perm_mixed_" + str(perm).zfill(4) + "_snr_" + str(snr),
-            )
+            if perm is None:
+                glm_dir = os.path.join(ses_dir, "run-" + str(run).zfill(2))
+            else:
+                glm_dir = os.path.join(
+                    ses_dir,
+                    "run-" + str(run).zfill(2),
+                    "GLM_Data_perm_mixed_" + str(perm).zfill(4) + "_snr_" + str(snr),
+                )
+
             n_res = len(glob.glob(os.path.join(glm_dir, "Res_*")))
             for res in range(1, n_res + 1):
                 res_image_path = os.path.join(glm_dir, "Res_" + str(res).zfill(4))
@@ -137,32 +144,58 @@ def pooled_sim_residuals_pipeline(sub, spm_dir, spm_type, ses_type, snr=1, perm=
 ##############################################################################
 
 
-def main(sub=1):
-    # Data analysis parameters
-    processing_mode = "both"  # Options: 'datasets', 'residuals' or 'both'
-    spm_type = "Data_perm"
-    task = "perception"
-    stimulus_set = "Test"
-    ses_type = "ses-" + task + stimulus_set
-    first_n_betas = 50
-    save_dataset = False
-    snr_range = [0.1, 1, 10]
-    n_perms = 1
-    delete_inputs = True
+def main(sub=1, data=False):
+    if not data:
+        # Data analysis parameters: Simulation
+        spm_type = "Data_perm"
+        task = "perception"
+        stimulus_set = "Test"
+        ses_type = "ses-" + task + stimulus_set
+        first_n_betas = 50
+        snr_range = [0.1, 1, 10]
+        delete_inputs = True
 
-    # Set directories, specify ROIs and load dictionary for labels
-    ds_dir = os.environ.get("SOURCE")
-    # spm_dir = os.path.join(ds_dir, "derivatives", spm_type)
-    spm_dir = os.path.join(os.environ.get("INTERMEDIATE"), spm_type)
-    n_subs = len(glob.glob(ds_dir + os.sep + "sub*"))
+        # Set directories, specify ROIs and load dictionary for labels
+        ds_dir = os.environ.get("SOURCE")
+        # spm_dir = os.path.join(ds_dir, "derivatives", spm_type)
+        spm_dir = os.path.join(os.environ.get("INTERMEDIATE"), spm_type)
+        img_output_dir = os.path.join(spm_dir, "sub-" + str(sub).zfill(2))
+        nifti_filename = os.path.join(
+            img_output_dir,
+            task + "_" + stimulus_set + "_data_perm_mixed_{perm:04d}_snr_{snr}",
+        )
+        perm_range = get_perm_range(img_output_dir, ses_type)
+    else:
+        # Data analysis parameters: True
+        spm_type = "Dual_GLM"
+        task = "perception"
+        stimulus_set = "Test"
+        ses_type = "ses-" + task + stimulus_set
+        first_n_betas = 50
+        snr_range = [None]
+        delete_inputs = False
+
+        # Set directories, specify ROIs and load dictionary for labels
+        ds_dir = os.environ.get("SOURCE")
+        spm_dir = os.path.join(ds_dir, "derivatives", spm_type)
+        img_output_dir = os.path.join(spm_dir, "sub-" + str(sub).zfill(2))
+        nifti_filename = os.path.join(img_output_dir, task + "_" + stimulus_set)
+        perm_range = [None]
+
+    processing_mode = "both"  # Options: 'datasets', 'residuals' or 'both'
 
     ##############################################################################
 
-    img_output_dir = os.path.join(spm_dir, "sub-" + str(sub).zfill(2))
-    perm_range = get_perm_range(img_output_dir, ses_type)
-
     for snr in snr_range:
         for perm in perm_range:
+            if not data:
+                nifti_fn = nifti_filename.format(perm=perm, snr=snr)
+            else:
+                nifti_fn = nifti_filename
+            csv_filename = nifti_fn + "_signal.csv"
+            csv_filename_r = nifti_fn + "_noise.csv"
+            nifti_filename_r = nifti_fn + "_noise.nii.gz"
+            nifti_fn = nifti_fn + "_signal.nii.gz"
             if processing_mode in ["datasets", "both"]:
                 # Load and stack 3d arrays for each GLM predictor for each run
                 (
@@ -172,7 +205,6 @@ def main(sub=1):
                 ) = pooled_sim_betas_pipeline(
                     sub,
                     spm_dir,
-                    spm_type,
                     ses_type,
                     snr=snr,
                     perm=perm,
@@ -181,34 +213,10 @@ def main(sub=1):
 
                 # Make subject-specific 4d nifti image of beta coeffients
                 pooled_betas = nifti1.Nifti1Image(pooled_betas_array, generic_affine)
-                nifti_filename = os.path.join(
-                    img_output_dir,
-                    "sub-"
-                    + str(sub).zfill(2)
-                    + "_"
-                    + task
-                    + "_"
-                    + stimulus_set
-                    + "_data_perm_mixed_"
-                    + str(perm).zfill(4)
-                    + "_snr_"
-                    + str(snr)
-                    + "_signal.nii.gz",
-                )
-                nifti1.save(pooled_betas, nifti_filename)
-                print("Pooled subject data to:", nifti_filename)
+                nifti1.save(pooled_betas, nifti_fn)
+                print("Pooled subject data to:", nifti_fn)
 
                 # Save corresponding descriptors for the 4th dimension
-                csv_filename = os.path.join(
-                    img_output_dir,
-                    "sub-"
-                    + str(sub).zfill(2)
-                    + "_"
-                    + task
-                    + "_"
-                    + stimulus_set
-                    + "_signal.csv",
-                )
                 df = pd.DataFrame({"descriptor": fourth_dimension_descriptors})
                 df.to_csv(csv_filename, header=False)
 
@@ -219,41 +227,17 @@ def main(sub=1):
                     generic_affine_r,
                     fourth_dimension_descriptors_r,
                 ) = pooled_sim_residuals_pipeline(
-                    sub, spm_dir, spm_type, ses_type, snr=snr, perm=perm
+                    sub, spm_dir, ses_type, snr=snr, perm=perm
                 )
 
                 # Make subject-specific 4d nifti image of residuals
                 pooled_residuals = nifti1.Nifti1Image(
                     pooled_residuals_array, generic_affine_r
                 )
-                nifti_filename_r = os.path.join(
-                    img_output_dir,
-                    "sub-"
-                    + str(sub).zfill(2)
-                    + "_"
-                    + task
-                    + "_"
-                    + stimulus_set
-                    + "_data_perm_mixed_"
-                    + str(perm).zfill(4)
-                    + "_snr_"
-                    + str(snr)
-                    + "_noise.nii.gz",
-                )
                 nifti1.save(pooled_residuals, nifti_filename_r)
                 print("Pooled subject noise to:", nifti_filename_r)
 
                 # Save corresponding descriptors for the 4th dimension
-                csv_filename_r = os.path.join(
-                    img_output_dir,
-                    "sub-"
-                    + str(sub).zfill(2)
-                    + "_"
-                    + task
-                    + "_"
-                    + stimulus_set
-                    + "_noise.csv",
-                )
                 df_r = pd.DataFrame({"descriptor": fourth_dimension_descriptors_r})
                 df_r.to_csv(csv_filename_r, header=False)
 
@@ -272,5 +256,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "-s", "--sub", help="Subject to run [1..5]", type=int, default=1
     )
+    parser.add_argument("--data", help="run original data", action="store_true")
     args = parser.parse_args()
     main(**vars(args))

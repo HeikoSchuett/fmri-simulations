@@ -64,13 +64,9 @@ def get_stim_desc(descriptors_path, label_dict=None):
     stim_ids = pd.read_csv(descriptors_path, sep="[, _]", header=None, engine="python")
     stim_ids.columns = ["row", "RegressorNames", "run"]
     runs = stim_ids["run"].to_list()
-
-    if isinstance(label_dict, dict):
-        labels = stim_id_to_label(stim_ids, label_dict, n_stim=None, crop=True)
-    else:
-        stim_ids["synset_id"] = "n0" + stim_ids["synset_id"].astype(str)
-        labels = stim_ids["RegressorNames"].to_list()
-    return labels, runs
+    labels = stim_id_to_label(stim_ids, label_dict, n_stim=None, crop=True)
+    synset = stim_ids["RegressorNames"]
+    return labels, synset, runs
 
 
 def cronbachs_alpha(stim_measurements):
@@ -264,7 +260,6 @@ def main(sub=1):
     # Set directories, specify ROIs and load dictionary for labels
     ds_dir = os.environ.get("SOURCE")
     # directory of mask descriptors
-    txt_dir = os.path.join(ds_dir, "HCP-MMP1_on_MNI152_ICBM2009a_nlin.txt")
     spm_dir = os.path.join(os.environ.get("INTERMEDIATE"), spm_type)
     # directory in which subject-specific volumetric ROI masks are saved by FS
     mask_dir = os.path.join(ds_dir, "derivatives", "Masks")
@@ -307,10 +302,7 @@ def main(sub=1):
                 signal_4d = None
                 signal_path = os.path.join(
                     glm_dir,
-                    "sub-"
-                    + str(sub).zfill(2)
-                    + "_"
-                    + task
+                    task
                     + "_"
                     + stimulus_set
                     + "_data_perm_mixed_"
@@ -321,12 +313,13 @@ def main(sub=1):
                 )
                 descriptors_path = os.path.join(
                     glm_dir,
-                    "sub-"
-                    + str(sub).zfill(2)
-                    + "_"
-                    + task
+                    task
                     + "_"
                     + stimulus_set
+                    + "_data_perm_mixed_"
+                    + str(perm).zfill(4)
+                    + "_snr_"
+                    + str(snr)
                     + "_signal.csv",
                 )
                 signal_4d = nifti1.load(signal_path)
@@ -335,10 +328,7 @@ def main(sub=1):
                 noise_4d = None
                 noise_path = os.path.join(
                     glm_dir,
-                    "sub-"
-                    + str(sub).zfill(2)
-                    + "_"
-                    + task
+                    task
                     + "_"
                     + stimulus_set
                     + "_data_perm_mixed_"
@@ -358,7 +348,7 @@ def main(sub=1):
                     measurements = mask_utils.apply_roi_mask_4d(
                         signal_4d, mask_dict[roi_h], method="custom"
                     )
-                    stimulus_descriptors, run_descriptors = get_stim_desc(
+                    stimulus_descriptors, synset, run_descriptors = get_stim_desc(
                         descriptors_path, label_dict=label_dict
                     )
 
@@ -405,6 +395,7 @@ def main(sub=1):
                             descriptors={"ROI": roi_h},
                             obs_descriptors={
                                 "stim": stimulus_descriptors,
+                                "synset": [str(i) for i in synset],
                                 "run": run_descriptors,
                             },
                             channel_descriptors={

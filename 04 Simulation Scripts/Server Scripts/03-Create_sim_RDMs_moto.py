@@ -13,6 +13,60 @@ import mask_utils
 import numpy as np
 import rsatoolbox
 
+# now unused:
+order = [
+    "n01443537",
+    "n01943899",
+    "n01976957",
+    "n02071294",  # water animals
+    "n01621127",
+    "n01846331",
+    "n01858441",
+    "n01677366",
+    "n02190790",
+    "n02274259",  # air and land animals (non-mammals)
+    "n02128385",
+    "n02139199",
+    "n02416519",
+    "n02437136",
+    "n02437971",  # land-Mammals
+    "n02951358",
+    "n03272010",
+    "n03482252",
+    "n03495258",  # humans in the picture
+    "n04254777",
+    "n03237416",
+    "n03124170",
+    "n03379051",
+    "n04572121",  # clothing
+    "n02824058",
+    "n02882301",
+    "n03345837",
+    "n04387400",
+    "n03716966",
+    "n03584254",
+    "n04533802",
+    "n03626115",
+    "n03941684",
+    "n03954393",
+    "n04507155",  # small, handy objects
+    "n02797295",
+    "n02690373",
+    "n02916179",
+    "n02950256",
+    "n03122295",
+    "n04252077",  # machines
+    "n03064758",
+    "n04210120",
+    "n04554684",
+    "n03452741",
+    "n03761084",  # large indoor objects
+    "n03710193",
+    "n03455488",
+    "n03767745",
+    "n04297750",
+]  # landmarks
+
 
 def sort_invert_and_numerate_dict(dictionary):
     inv_dict = {}
@@ -175,67 +229,6 @@ def main(sub=1):
         )
     )
     roi_h_list = list(mask_dict.keys())
-    label_dict = np.load(
-        os.path.join(ds_dir, "custom_synset_dictionary.npy"), allow_pickle="TRUE"
-    ).item()
-    label2num = sort_invert_and_numerate_dict(label_dict)
-    order = [
-        "n01443537",
-        "n01943899",
-        "n01976957",
-        "n02071294",  # water animals
-        "n01621127",
-        "n01846331",
-        "n01858441",
-        "n01677366",
-        "n02190790",
-        "n02274259",  # air and land animals (non-mammals)
-        "n02128385",
-        "n02139199",
-        "n02416519",
-        "n02437136",
-        "n02437971",  # land-Mammals
-        "n02951358",
-        "n03272010",
-        "n03482252",
-        "n03495258",  # humans in the picture
-        "n04254777",
-        "n03237416",
-        "n03124170",
-        "n03379051",
-        "n04572121",  # clothing
-        "n02824058",
-        "n02882301",
-        "n03345837",
-        "n04387400",
-        "n03716966",
-        "n03584254",
-        "n04533802",
-        "n03626115",
-        "n03941684",
-        "n03954393",
-        "n04507155",  # small, handy objects
-        "n02797295",
-        "n02690373",
-        "n02916179",
-        "n02950256",
-        "n03122295",
-        "n04252077",  # machines
-        "n03064758",
-        "n04210120",
-        "n04554684",
-        "n03452741",
-        "n03761084",  # large indoor objects
-        "n03710193",
-        "n03455488",
-        "n03767745",
-        "n04297750",
-    ]  # landmarks
-
-    p = []  # Permutation vector
-    for i in range(len(order)):
-        p.append(label2num[label_dict[order[i]]])
-    p = np.array(p)
     snr_range = [0.1, 1, 10]
     run_subsets = [2 ** (i + 1) for i in range(5)]
 
@@ -340,8 +333,7 @@ def main(sub=1):
                                 cv_descriptor="run",
                                 noise=precision,
                             )
-                            rdm_p = rsatoolbox.rdm.rdms.permute_rdms(rdm, p=p)
-                            rdm_p.rdm_descriptors = {
+                            rdm.rdm_descriptors = {
                                 "index": np.array([0]),
                                 "sub": np.array([sub]),
                                 "prec_type": np.array([get_precision]),
@@ -356,15 +348,13 @@ def main(sub=1):
                             }
 
                             # Collect single RDMs
-                            if isinstance(rdms, list):
-                                rdms = rdm_p
-                            else:
-                                rdms.append(rdm_p)
+                            rdms.append(rdm)
     if remove_ds:
         shutil.rmtree(dataset_dir)
         shutil.rmtree(res_dir)
 
     if calculate_rdm:
+        rdms = rsatoolbox.rdm.concat(rdms)
         # Save subject RDM
         rdm_filename = os.path.join(rdm_output_dir, "RDM_" + beta_type)
         rdms.save(rdm_filename, file_type="hdf5", overwrite=True)
