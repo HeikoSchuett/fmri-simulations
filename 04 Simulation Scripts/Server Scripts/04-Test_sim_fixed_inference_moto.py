@@ -244,7 +244,7 @@ def main():
     roi_h_list = list(mask_dict.keys())
     mask_dict = None
     n_stim = np.flip([5, 10, 20, 30, 50])
-    comp_methods = ["corr", "cosine_cov", "cosine"]
+    comp_methods = ["cosine_cov", "corr", "cosine"]
 
     # load permutation
     permutations = np.loadtxt(
@@ -350,11 +350,20 @@ def main():
                                 )
 
                                 # Perform inference
-                                fixed_results = (
-                                    rsatoolbox.inference.eval_bootstrap_pattern(
+
+                                if method == "cosine_cov":
+                                    fixed_results = rsatoolbox.inference.eval_fixed(
                                         fixed_models, data_rdms_sub, method=method
                                     )
-                                )
+                                else:
+                                    fixed_results = (
+                                        rsatoolbox.inference.eval_bootstrap_pattern(
+                                            fixed_models,
+                                            data_rdms_sub,
+                                            method=method,
+                                            boot_noise_ceil=False,
+                                        )
+                                    )
 
                                 # rsatoolbox.vis.plot_model_comparison(fixed_results)
                                 summary = results_summary(fixed_results, roi_h)
