@@ -11,7 +11,8 @@ import numpy as np
 import pandas as pd
 import os
 
-results_folder = os.path.join(os.environ["SOURCE"], "derivatives", "results/")
+results_folder = os.path.join(os.environ.get(
+    "SOURCE", default=""), "derivatives", "results/")
 
 
 def generic_lables(results_folder=results_folder):
@@ -27,7 +28,8 @@ def generic_lables(results_folder=results_folder):
     labels = full_csv[perm_idx][
         ["GT", "comparison_method", "n_stim", "n_runs", "NN", "nsf"]
     ]
-    labels["GT"] = labels["GT"].replace({"_left": "-l", "_right": "-r"}, regex=True)
+    labels["GT"] = labels["GT"].replace(
+        {"_left": "-l", "_right": "-r"}, regex=True)
     labels.to_csv(results_folder + "labels.csv")
     print("Saved labels to", results_folder)
     return perm_idx
@@ -52,17 +54,8 @@ def extract_stats(results_folder=results_folder, perm_idx=None):
         del full_npy_tmp
         means_stacked = np.stack(means_list, axis=0)
         stds_stacked = np.stack(stds_list, axis=0)
-
-        if isinstance(perm_idx, pd.core.series.Series):
-            means_superset.append(means_stacked[perm_idx])
-            means_superset.append(means_stacked[~perm_idx])
-            stds_superset.append(stds_stacked[perm_idx])
-            stds_superset.append(stds_stacked[~perm_idx])
-        else:
-            means_superset.append(means_stacked[0:6000])
-            means_superset.append(means_stacked[6000::])
-            stds_superset.append(stds_stacked[0:6000])
-            stds_superset.append(stds_stacked[6000::])
+        means_superset.append(means_stacked)
+        stds_superset.append(stds_stacked)
 
     means = np.stack(means_superset, axis=1)
     stds = np.stack(stds_superset, axis=1)
@@ -70,5 +63,6 @@ def extract_stats(results_folder=results_folder, perm_idx=None):
     np.save(results_folder + "stds.npy", stds)
 
 
-perm_idx = generic_lables()
-extract_stats(perm_idx=perm_idx)
+if __name__ == "__main__":
+    perm_idx = generic_lables()
+    extract_stats(perm_idx=perm_idx)
