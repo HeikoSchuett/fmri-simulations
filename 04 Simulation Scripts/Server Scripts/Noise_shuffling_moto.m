@@ -3,6 +3,7 @@ function Noise_shuffling_moto(i)
 %     Noise shuffling and scaling while preserving serial autocorrelations
 %     and spatial structure (w/ AR(2) model)
 %==========================================================================
+rng("shuffle")
 
 %% 1. Preparations
 %----- Custom paths
