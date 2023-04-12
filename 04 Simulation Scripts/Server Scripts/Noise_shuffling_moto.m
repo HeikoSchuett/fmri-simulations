@@ -1,9 +1,9 @@
-function Noise_shuffling_moto(i)
+function Noise_shuffling_moto(i, seed)
 %==========================================================================
 %     Noise shuffling and scaling while preserving serial autocorrelations
 %     and spatial structure (w/ AR(2) model)
 %==========================================================================
-rng("shuffle")
+rng(10000*i + seed)
 
 %% 1. Preparations
 %----- Custom paths

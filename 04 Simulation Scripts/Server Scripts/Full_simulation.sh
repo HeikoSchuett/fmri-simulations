@@ -26,7 +26,7 @@ export MATLAB_CODE='/moto/home/hs3110/fmri-simulations/matlab'
 cd "$CODE"
 for i in {1..5}
 do
-  matlab -nodisplay -nosplash -nodesktop -r "cd '$CODE'; Noise_shuffling_moto($i); exit"
+  matlab -nodisplay -nosplash -nodesktop -r "cd '$CODE'; Noise_shuffling_moto($i, $SLURM_ARRAY_TASK_ID); exit"
   matlab -nodisplay -nosplash -nodesktop -r "cd '$CODE'; GLM_on_sim_moto($i); exit"
   rm -rf $INTERMEDIATE/Noise_perm
   python 01-Pool_simulation_results_moto.py -s $i
